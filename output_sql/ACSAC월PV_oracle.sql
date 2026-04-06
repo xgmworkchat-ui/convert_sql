@@ -65,11 +65,11 @@
             , T1.CA수수료등급                                                                           AS CA수수료등급
             , 0                                                                                         AS CA수수료율
 
-       FROM  	DM.월개인본인회원실적  T1, ACRM.CRM단가 T2
+       FROM  	DM.월개인본인회원실적  T1
+       JOIN  	ACRM.CRM단가 T2 ON T1.기준년월 = T2.기준년월
        WHERE  	T1.기준년월   = EDW_전월
        AND	T1.유효회원여부=1
-       AND	T1.본인가족구분코드_발급기준 in ('1','3')	
-       AND	T1.기준년월=T2.기준년월  ;
+       AND	T1.본인가족구분코드_발급기준 in ('1','3')  ;
 
       COMMIT;
 
@@ -91,14 +91,15 @@
               T1.할부수수료등급                                 AS 할부수수료등급
             , T1.할부수수료율                                   AS 할부수수료율
 
-        FROM  DW.할부수수료율  T1, 	ACRM.CRM단가 T2
+        FROM  DW.할부수수료율  T1
+        JOIN  ACRM.CRM단가 T2
+              ON  T1.시작할부개월수 <= T2.신용공여기간_할부
+             AND  T1.종료할부개월수 >= T2.신용공여기간_할부
        WHERE  T1.카드개인법인회원구분코드 = '1' --개인
          AND  T2.기준년월=EDW_전월
          AND  T1.적용일자 = ( SELECT MAX(적용일자)
                                 FROM DW.할부수수료율
-                               WHERE 카드개인법인회원구분코드 = '1' ) 
-	AND T1.시작할부개월수<= T2.신용공여기간_할부
-	AND T1.종료할부개월수>= T2.신용공여기간_할부  ;
+                               WHERE 카드개인법인회원구분코드 = '1' )  ;
       COMMIT;
 
      -- 최근 적용된 CA수수료율 적용
@@ -111,14 +112,15 @@
               T1.현금서비스수수료등급                           AS CA수수료등급
             , MIN(T1.현금서비스수수료율)                        AS CA수수료율
 
-        FROM  DW.현금서비스수수료율  T1,  ACRM.CRM단가 T2
+        FROM  DW.현금서비스수수료율  T1
+        JOIN  ACRM.CRM단가 T2
+              ON  T1.시작신용공여일수 <= T2.신용공여기간_CA
+             AND  T1.종료신용공여일수 >= T2.신용공여기간_CA
        WHERE  T1.카드개인법인회원구분코드 = '1' --개인
          AND  T2.기준년월=EDW_전월
          AND  T1.적용일자 = ( SELECT MAX(적용일자)
                                 FROM DW.현금서비스수수료율
                                WHERE 카드개인법인회원구분코드 = '1' )
-      AND T1.시작신용공여일수<= T2.신용공여기간_CA
-      AND T1.종료신용공여일수>= T2.신용공여기간_CA
       GROUP BY   T1.현금서비스수수료등급  ;
     
       COMMIT;
@@ -207,8 +209,8 @@
             , 0                                                                         AS 이용수수료_할부
             , 0                                                                         AS 이용수수료_CA
 
-        FROM  TEMPACRM_월개인본인회원실적  T1, TEMPACRM_월복수카드이용실적 T2
-       WHERE  T1.주민번호 = T2.주민번호 ;
+        FROM  TEMPACRM_월개인본인회원실적  T1
+        JOIN  TEMPACRM_월복수카드이용실적  T2 ON T1.주민번호 = T2.주민번호 ;
 
       COMMIT;
 
@@ -342,10 +344,9 @@
              T1.이용금액_CA_타사     * T2.브랜드로얄티비율_CA)                                AS 브랜드로열티
           , SYSDATE                                                                            AS DM적재일시
 
-      FROM  TEMPACRM_PV                   T1,
-            ACRM.CRM단가                  T2
-
-     WHERE  T2.기준년월  = DATEFORMAT(ADD_MONTHS(DATE(''$1''||''01''), -1) ,''YYYYMM'')       ';
+      FROM  TEMPACRM_PV                   T1
+      JOIN  ACRM.CRM단가                  T2
+            ON T2.기준년월 = DATEFORMAT(ADD_MONTHS(DATE(''$1''||''01''), -1) ,''YYYYMM'')       ';
       CALL  SP_EXTRACT(EXTRACT_DAT, EXTRACT_SQL);
 
       COMMIT;
